@@ -50,17 +50,12 @@
 			<view class="divider"><text>外部平台一键认证</text></view>
 			<view class="platform-list">
 				<view class="p-item" @tap="handleThirdParty('猪八戒网')">
-					<image src="/static/zhubajie.png" mode="aspectFit" /><text>猪八戒网</text>
+					<image src="/static/icon/zhubajie.png" mode="aspectFit" /><text>猪八戒网</text>
 				</view>
 				<view class="p-item" @tap="handleThirdParty('站酷')">
-					<image src="/static/zhanku.png" mode="aspectFit" /><text>站酷</text>
+					<image src="/static/icon/zhanku.png" mode="aspectFit" /><text>站酷</text>
 				</view>
 			</view>
-		</view>
-
-		<view class="footer-info">
-			<text>{{ footerTips[activeRole] }}</text>
-			<view class="path-tag">虚拟存储节点: {{ JSON_FILES[activeRole] }}</view>
 		</view>
 	</view>
 </template>
@@ -68,11 +63,11 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
 
-// 1. 模拟文件路径配置
-const JSON_FILES = {
-	nomad: '/user/nomads.json',
-	merchant: '/user/merchants.json',
-	gov: '/user/admins.json'
+// 存储键名
+const STORAGE_KEYS = {
+	nomad: 'users_nomad',
+	merchant: 'users_merchant',
+	gov: 'users_gov'
 };
 
 const isLogin = ref(true);
@@ -83,11 +78,6 @@ const roles = [
 	{ id: 'gov', name: '政府/管理方' }
 ];
 const categories = ['餐饮美食', '精品民宿', '文旅景区', '休闲娱乐'];
-const footerTips = {
-	nomad: '🎁 认证即领 7 天免费共享工位',
-	merchant: '📈 接入平台，获取数字游民消费画像',
-	gov: '📊 实时看板：掌握全市数据要素动态'
-};
 
 const formData = reactive({
 	phone: '',
@@ -97,94 +87,97 @@ const formData = reactive({
 });
 
 onMounted(() => {
-	// 初始化虚拟存储环境
-	Object.values(JSON_FILES).forEach(path => {
-		if (!uni.getStorageSync(path)) {
-			uni.setStorageSync(path, []);
-		}
+	// 初始化存储空间
+	Object.values(STORAGE_KEYS).forEach(key => {
+		if (!uni.getStorageSync(key)) uni.setStorageSync(key, []);
 	});
 	
-	// 预置政府管理员数据
-	const adminPath = JSON_FILES.gov;
-	const admins = uni.getStorageSync(adminPath) || [];
+	// 预置政府管理员数据 (13800000000 / admin)
+	const admins = uni.getStorageSync(STORAGE_KEYS.gov) || [];
 	if (admins.length === 0) {
-		admins.push({ phone: '13800000000', password: 'admin', role: 'gov' });
-		uni.setStorageSync(adminPath, admins);
+		admins.push({ phone: '13800000000', password: 'admin' });
+		uni.setStorageSync(STORAGE_KEYS.gov, admins);
 	}
 });
 
 const switchRole = (role) => {
 	activeRole.value = role;
 	isLogin.value = true;
+	formData.phone = '';
+	formData.password = '';
 };
 
 const onCategoryChange = (e) => {
 	formData.category = categories[e.detail.value];
 };
 
-/**
- * 提交逻辑：处理登录比对及注册写入
- */
-const handleSubmit = () => {
+const handleSubmit = async () => {
+	// 1. 校验手机号和密码变量名 (必须使用 formData.phone)
 	if (!formData.phone || !formData.password) {
-		return uni.showToast({ title: '请填写完整', icon: 'none' });
+		return uni.showToast({ title: '请填写完整信息', icon: 'none' });
 	}
 
-	const targetPath = JSON_FILES[activeRole.value];
-	let userList = uni.getStorageSync(targetPath) || [];
+	const key = STORAGE_KEYS[activeRole.value];
+	let userList = uni.getStorageSync(key) || [];
 
-	if (isLogin.value) {
-		// --- 登录逻辑 ---
-		const user = userList.find(u => u.phone === formData.phone && u.password === formData.password);
-		if (user) {
-			uni.showToast({ title: '登录成功', icon: 'success' });
+	uni.showLoading({ title: isLogin.value ? '登录中...' : '注册中...' });
+
+	setTimeout(() => {
+		uni.hideLoading();
+
+		if (!isLogin.value) {
+			// --- 注册逻辑 ---
+			const isExist = userList.find(u => u.phone === formData.phone);
+			if (isExist) return uni.showToast({ title: '手机号已存在', icon: 'none' });
+
+			// 保存新用户
+			const newUser = { ...formData };
+			userList.push(newUser);
+			uni.setStorageSync(key, userList);
 			
-			// 关键：存储当前登录的用户 Session 信息
-			uni.setStorageSync('current_user_session', user); 
-			
-			// 关键：跳转至 pages/view/HomeView.vue
-			setTimeout(() => {
-				uni.navigateTo({
-					url: '/pages/view/HomeView'
-				});
-			}, 1000);
+			uni.showToast({ title: '注册成功' });
+			isLogin.value = true; // 注册完切换到登录
 		} else {
-			uni.showToast({ title: '账号或密码错误', icon: 'none' });
-		}
-	} else {
-		// --- 注册逻辑 ---
-		if (userList.some(u => u.phone === formData.phone)) {
-			return uni.showToast({ title: '该号码已注册', icon: 'none' });
-		}
+			// --- 登录逻辑 ---
+			const user = userList.find(u => u.phone === formData.phone && u.password === formData.password);
+			
+			if (user) {
+				// 存入当前 Session
+				const sessionData = {
+					...user,
+					role: activeRole.value,
+					_id: "USER_" + formData.phone,
+					shop_name: activeRole.value === 'merchant' ? (user.category + '小店') : ''
+				};
+				uni.setStorageSync('current_user_session', sessionData);
 
-		const newUser = {
-			phone: formData.phone,
-			password: formData.password,
-			role: activeRole.value,
-			regSource: targetPath, 
-			createTime: new Date().getTime(),
-			...(activeRole.value === 'nomad' && { job: formData.job }),
-			...(activeRole.value === 'merchant' && { category: formData.category })
-		};
-
-		userList.push(newUser);
-		uni.setStorageSync(targetPath, userList);
-		
-		uni.showToast({ title: '注册并写入成功' });
-		isLogin.value = true;
-	}
+				// 根据角色精准跳转
+				if (activeRole.value === 'gov') {
+					uni.reLaunch({ url: '/pages/gov/GovHomeView' });
+				} else if (activeRole.value === 'merchant') {
+					uni.reLaunch({ url: '/pages/view/Merchant/MerchantHome' });
+				} else {
+					uni.reLaunch({ url: '/pages/view/HomeView' });
+				}
+				uni.showToast({ title: '欢迎回来' });
+			} else {
+				uni.showToast({ title: '账号或密码错误', icon: 'none' });
+			}
+		}
+	}, 800);
 };
 
 const handleThirdParty = (name) => {
 	uni.showModal({
 		title: '生态认证',
-		content: `是否同步您在${name}的信用分及技能认证数据？`,
-		success: (res) => { if (res.confirm) uni.showToast({ title: '同步成功', icon: 'success' }); }
+		content: `是否同步您在${name}的数据？`,
+		success: (res) => { if (res.confirm) uni.showToast({ title: '同步成功' }); }
 	});
 };
 </script>
 
 <style lang="scss">
+/* 保持你原来的样式不变 */
 .container {
 	padding: 40rpx; min-height: 100vh; background: linear-gradient(180deg, #F8FBFF 0%, #FFFFFF 100%);
 	.header { padding: 80rpx 0 40rpx; text-align: center;
@@ -217,10 +210,6 @@ const handleThirdParty = (name) => {
 				text { font-size: 24rpx; color: #888; } 
 			} 
 		}
-	}
-	.footer-info { 
-		position: fixed; bottom: 60rpx; left: 0; right: 0; text-align: center; font-size: 24rpx; color: #007aff; 
-		.path-tag { font-size: 20rpx; color: #bbb; margin-top: 10rpx; }
 	}
 }
 </style>
