@@ -1,17 +1,30 @@
 {
-  "pages": [
-    {
-      "path": "pages/login/login",
-      "style": {
-        "navigationBarTitleText": "登录",
-        "navigationStyle": "custom"
-      }
-    },
-    {
-      "path": "pages/view/HomeView",
-      "style": {
-        "navigationBarTitleText": "聊城数字游民服务"
-      }
-    }
-  ]
+	"pages": [
+		{
+			"path": "pages/login/login",
+			"style": { "navigationStyle": "custom" }
+		},
+		/* --- 政府端 --- */
+		{ "path": "pages/gov/GovHomeView", "style": { "navigationStyle": "custom" } },
+		{ "path": "pages/gov/AuditView", "style": { "navigationBarTitleText": "审核管理" } },
+		{ "path": "pages/gov/EcoView", "style": { "navigationBarTitleText": "生态合作监控" } },
+		{ "path": "pages/gov/ActivityView", "style": { "navigationBarTitleText": "活动管理" } },
+		
+		/* --- 商户端 --- */
+		{ "path": "pages/view/Merchant/MerchantHome", "style": { "navigationBarTitleText": "经营工作台" } },
+		{ "path": "pages/view/Merchant/MerchantApply", "style": { "navigationBarTitleText": "入驻资质申请" } },
+        // ... 其他商户页
+        
+		/* --- 游民端 --- */
+		{ "path": "pages/view/HomeView", "style": { "navigationBarTitleText": "首页" } },
+		{ "path": "pages/view/MapView", "style": { "navigationBarTitleText": "社区地图" } },
+		{ "path": "pages/view/TreasureView", "style": { "navigationBarTitleText": "寻找宝藏" } },
+		{ "path": "pages/view/AllianceView", "style": { "navigationBarTitleText": "生态联盟" } }
+	],
+	"globalStyle": {
+		"navigationBarTextStyle": "black",
+		"navigationBarTitleText": "聊城数字游民服务",
+		"navigationBarBackgroundColor": "#F8F8F8",
+		"backgroundColor": "#F8F8F8"
+	}
 }
